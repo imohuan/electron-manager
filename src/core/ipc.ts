@@ -1,28 +1,30 @@
 import { BrowserWindow, ipcMain, IpcMain, ipcRenderer, IpcRenderer } from "electron";
-import { isArray, isFunction, set } from "lodash-es";
+import { get, isArray, isFunction, set } from "lodash-es";
 
 import { cloneData, md5 } from "../helper/utils";
 import { IpcRaw } from "../typings/ipc";
+import { Context } from "./context";
 
 class IpcInit {
   protected ipcMap: Map<string, IpcRaw[]>;
   protected ipcInstance: IpcMain | IpcRenderer;
+  protected context: Context;
 
-  constructor() {
-    if (manager.isMain) this.init();
-    else this.renderInit();
+  constructor(context: Context) {
+    this.context = context;
     this.ipcMap = new Map();
     this.ipcInstance = ipcMain || ipcRenderer;
+    this.context.isMain ? this.initMain() : this.initRenderer();
   }
 
-  private init() {
-    manager.set("ipc", new Map());
+  private initMain() {
+    set(global, "ipc", new Map());
     ipcMain.on("get-ipc", (event) => {
       event.returnValue = cloneData(this.onGet());
     });
 
     ipcMain.on("add-ipc", (event, name, ipcRaw) => {
-      this.onAdd(manager.get("ipc"), name, ipcRaw);
+      this.onAdd(this.context.get("ipc")!, name, ipcRaw);
       event.returnValue = "ok";
     });
 
@@ -34,19 +36,21 @@ class IpcInit {
     ipcMain.on("clear-ipc", () => this.onClear());
   }
 
-  private renderInit() {
-    ipcRenderer.on("clear-ipc", () => {
-      console.log("clear-ipc");
-      this.onClear();
-    });
+  private initRenderer() {
+    ipcRenderer.on("clear-ipc", () => this.onClear());
   }
 
   private eq(obj1: any, obj2: any): boolean {
     return obj1.id === obj2.id;
   }
 
+  protected getIpcMap(): Map<string, IpcRaw[]> {
+    return get(global, "ipc", new Map());
+  }
+
   private onGet() {
-    return Array.from(manager.get("ipc").entries()).reduce((pre, [key, value]) => {
+    const ipcMap = this.getIpcMap();
+    return Array.from(ipcMap.entries()).reduce((pre, [key, value]) => {
       return Object.assign(pre, { [key]: value });
     }, {});
   }
@@ -59,7 +63,7 @@ class IpcInit {
     const target = ipcMap.get(name)!;
     const isExists = target.find((f) => this.eq(f, ipcRaw));
     if (isExists) {
-      manager.logger.error("ipc 监听已经存在");
+      this.context.logger.error("ipc 监听已经存在");
       return;
     }
     target.push(ipcRaw);
@@ -76,24 +80,23 @@ class IpcInit {
   }
 
   private onRemove(name: string, id: number) {
-    this.onBaseRemove(manager.get("ipc"), name, id);
+    this.onBaseRemove(this.context.get("ipc")!, name, id);
     this.onBaseRemove(this.ipcMap, name, id);
   }
 
   /** 清空按当前线程的IPC绑定 */
   protected onClear() {
     Array.from(this.ipcMap.entries()).forEach(([name, ipcRaws]) => {
-      console.log("ipcRaw", name, ipcRaws);
       ipcRaws.forEach((ipcRaw) => this.off(name, ipcRaw));
     });
     this.ipcMap = new Map();
   }
 
   protected call(name: "get-ipc" | "add-ipc" | "remove-ipc", ...args: any[]): any {
-    if (manager.isMain) {
+    if (this.context.isMain) {
       if (name === "get-ipc") return this.onGet();
       if (name === "add-ipc") {
-        this.onAdd(manager.get("ipc"), args[0], args[1]);
+        this.onAdd(this.context.get("ipc")!, args[0], args[1]);
         this.onAdd(this.ipcMap, args[0], args[1]);
         return;
       }
@@ -115,7 +118,7 @@ class IpcInit {
   }
 }
 
-export interface InvokeOption {
+interface InvokeOption {
   /** 指定 invoke 那个窗口的程序 */
   name: string | string[];
   /** 指定 当前 invoke 超时时间 */
@@ -137,28 +140,34 @@ export class IpcResult<T extends (...args: any) => any> {
     this.list = list || [];
   }
 
+  /** 获取第一个数据 */
   first(): Item<T> | null {
     return this.list?.[0] || null;
   }
 
-  nonEmptyFirst(): Item<T> | null {
+  /** 获取第一个有效数据 */
+  one(): Item<T> | null {
     return this.list.filter((item) => item)?.[0] || null;
   }
 
+  /** 获取最后一个数据 */
   last(): Item<T> | null {
     const length = this.list.length;
     if (length === 0) return null;
     return this.list[length - 1];
   }
 
+  /** 获取对应名称的返回数据 */
   getByName(name: string): Item<T> | null {
     return this.list.find((f) => f.ipcRaw.option?.name === name) || null;
   }
 
+  /** 获取对应id的返回数据 */
   getById(id: number): Item<T> | null {
     return this.list.find((f) => f.ipcRaw.id === id) || null;
   }
 
+  /** 获取列表 */
   getList() {
     return this.list;
   }
@@ -168,8 +177,8 @@ export class Ipc<T extends Record<string, (...args: any) => any> = any> extends 
   /** 设置 `invoke` 超时时间 */
   private timeout: number;
 
-  constructor() {
-    super();
+  constructor(context: Context) {
+    super(context);
     this.timeout = 60000;
   }
 
@@ -206,7 +215,7 @@ export class Ipc<T extends Record<string, (...args: any) => any> = any> extends 
     option: Partial<InvokeOption> = {}
   ): Promise<ReturnType<T[K]> | null> {
     const name: any = key;
-    const sendValue = { id: md5(), isMain: manager.isMain };
+    const sendValue = { id: md5(), isMain: this.context.isMain };
 
     let close = () => {};
     const cb = (name: string, sendValue: { id: string }) => {
@@ -223,7 +232,7 @@ export class Ipc<T extends Record<string, (...args: any) => any> = any> extends 
 
     return new Promise(async (_resolve) => {
       // console.log("[invoke]", { key, ipcRaw, args });
-      if (manager.isMain) {
+      if (this.context.isMain) {
         // 主进程 向其他进程 发送信息
         if (ipcRaw.isMain) {
           // 主进程 -> 主进程
@@ -316,8 +325,8 @@ export class Ipc<T extends Record<string, (...args: any) => any> = any> extends 
     const ipcRaw: IpcRaw = {
       id: -1,
       name,
-      isMain: manager.isMain,
-      option: manager.currentOption,
+      isMain: this.context.isMain,
+      option: this.context.getCurrentOption(),
       callback
     };
 
@@ -328,7 +337,7 @@ export class Ipc<T extends Record<string, (...args: any) => any> = any> extends 
       this.ipcMap.has(name) &&
       this.ipcMap.get(name)!.findIndex((_ipcRaw) => _ipcRaw.id === ipcRaw.id) !== -1
     ) {
-      manager.logger.error("重复注册ipc: ", ipcRaw);
+      this.context.logger.error("重复注册ipc: ", ipcRaw);
       return null;
     }
 
@@ -337,7 +346,7 @@ export class Ipc<T extends Record<string, (...args: any) => any> = any> extends 
       return async (data: any) => {
         const sendValue = { id: ops.id, result: data };
         const nName = `r-cb-${name}`;
-        if (manager.isMain) {
+        if (this.context.isMain) {
           const id = event.frameId;
           const win = BrowserWindow.getAllWindows().find((f) => f.webContents.id === id);
           win?.webContents.send(nName, sendValue);
@@ -352,7 +361,7 @@ export class Ipc<T extends Record<string, (...args: any) => any> = any> extends 
     const _callback: Function = callback;
     this.call("add-ipc", name, ipcRaw);
 
-    if (manager.isMain) {
+    if (this.context.isMain) {
       ipcMain.handle(name, async (e, { id, isMain }, args: any[]) => {
         set(e, "emit", cb(e, { id, isMain }));
         // console.log("[args]", args);
@@ -378,19 +387,16 @@ export class Ipc<T extends Record<string, (...args: any) => any> = any> extends 
    * @param id `webContentId` 或者 为 -1(主进程)
    */
   clear(id: number = -1) {
-    if (manager.isMain) {
+    if (this.context.isMain) {
       if (id === -1) this.onClear();
       const window = BrowserWindow.getAllWindows().find((f) => f.webContents.id === id);
       !window?.isDestroyed() && window?.webContents.send("clear-ipc");
-      const ipcList = Array.from(manager.get("ipc").entries());
-      ipcList.forEach(([key, ipcRaws]) => {
-        ipcRaws.forEach((ipcRaw) => {
-          if (ipcRaw.id === id) this.call("remove-ipc", key, ipcRaw.id);
-        });
-      });
-    } else {
-      this.onClear();
-    }
+    } else this.onClear();
+  }
+
+  private getWatchName(name: string) {
+    const updateName = "UPDATE_STORE:";
+    return name.startsWith(updateName) ? name : `${updateName}${name}`;
   }
 
   /** 发布 */
@@ -400,15 +406,16 @@ export class Ipc<T extends Record<string, (...args: any) => any> = any> extends 
 
   /** 订阅 */
   subscribe(name: string, cb: Function) {
-    name = name.replace(/^watch::/, "UPDATE_STORE:");
+    name = this.getWatchName(name);
     this.handle(name, (...args: any[]) => cb(...args));
     return () => this.unsubscribe(name);
   }
 
   /** 取消订阅 */
   unsubscribe(name: string) {
+    name = this.getWatchName(name);
     let id = -1;
-    if (!manager.isMain) id = require("@electron/remote").getCurrentWindow().webContents.id;
+    if (!this.context.isMain) id = require("@electron/remote").getCurrentWindow().webContents.id;
     this.call("remove-ipc", name, id);
   }
 }

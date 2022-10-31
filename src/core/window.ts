@@ -1,20 +1,26 @@
 import { BrowserWindow, webContents } from "electron";
-import { defaultsDeep, random } from "lodash-es";
-import type { Window } from "../typings/index";
+import { defaultsDeep, get, set } from "lodash-es";
 
+import { isMain } from "../helper/electron";
+import { Context } from "./context";
+
+import type { Window } from "../typings";
 export class WindowFactory {
+  context: Context;
   private winMap: Map<string, any>;
 
-  constructor() {
+  constructor(context: Context) {
+    this.context = context;
     this.winMap = new Map();
+    this.init();
   }
 
-  createMain(opts: Window): BrowserWindow {
-    return this.create("renderer", opts);
-  }
-
-  createPlugin(opts: Window): BrowserWindow {
-    return this.create("plugin", opts);
+  private init() {
+    const remoteInitName = "remote-init";
+    if (isMain() && !get(global, remoteInitName, false)) {
+      require("@electron/remote/main").initialize();
+      set(global, remoteInitName, true);
+    }
   }
 
   create(name: string, opts: Window): BrowserWindow {
@@ -51,26 +57,18 @@ export class WindowFactory {
     }
 
     this.winMap.set(name, window);
-    this.setWindowOption(name, window, option);
+    this.context
+      .get("windows")!
+      .set(name, { name, id: window.id, webContentId: window.webContents.id, option });
 
     window.on("close", () => {
       const webContentId = window.webContents.id;
-      manager.ipc.clear(webContentId);
+      this.context.ipc.clear(webContentId);
       this.delete(name);
       if (option?.reload) this.create(name, option);
     });
 
     return window;
-  }
-
-  private setWindowOption(name: string, window: BrowserWindow, option: Window) {
-    manager
-      .get("windows")
-      .set(name, { name, id: window.id, webContentId: window.webContents.id, option });
-  }
-
-  private deleteWindowOption(name: string) {
-    manager.get("windows").delete(name);
   }
 
   /** 删除并且销毁对应名称的窗口 */
@@ -79,17 +77,13 @@ export class WindowFactory {
       const win: BrowserWindow = this.winMap.get(name);
       !win.isDestroyed() && win.destroy();
       this.winMap.delete(name);
-      this.deleteWindowOption(name);
+      this.context.get("windows")!.delete(name);
     }
   }
 
   /** 销毁所有创建的窗口 */
   destroy() {
-    this.winMap.forEach((win: BrowserWindow, name: string) => {
-      !win.isDestroyed() && win.destroy();
-      this.winMap.delete(name);
-      this.deleteWindowOption(name);
-    });
+    this.winMap.forEach((_: BrowserWindow, name: string) => this.delete(name));
   }
 
   /** 获取对应名称的窗口实例 */

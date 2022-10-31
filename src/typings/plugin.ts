@@ -1,19 +1,12 @@
-import { Manager } from "../core/manager";
-import Electron from "electron";
-
+import { PluginDownload } from "../core/download";
 import { Result } from "../helper/result";
-import { IpcRouter } from "./ipc";
-import { ManagerData } from "./manager";
+import { Context } from "../core/context";
 
-export type PluginInstallType = "npm" | "local" | "url" | "github" | "gitee";
-export type UpdateItem = { url: string; type: PluginInstallType };
-
-export type UserPlugin =
-  | { [key: string]: Function }
-  | ((
-      manager: Manager<ManagerData<Record<string, any>>, IpcRouter>,
-      electron: typeof Electron
-    ) => Promise<any>);
+export type DownloadInstance = new (
+  context: Context,
+  url: string,
+  pluginDir: string
+) => PluginDownload;
 
 export interface PluginConfig {
   /** 名称 */
@@ -32,30 +25,13 @@ export interface PluginConfig {
   script: string | { main: string; renderer: string };
 }
 
-// onAppStart?(): any;
-// onAppEnd?(): any;
-// onWindowCreate?(): any;
-// onWindowClose?(): any;
-// onWebContentLoad?(): any;
-
-export interface UpdateOption {
-  /** 已经检查了的插件 */
-  hasCheck: PluginConfig[];
-  /** 已经检查了的插件 */
-  noCheck: string[];
-  /** 检查的状态 */
-  type: "start" | "cron";
-  /** 定时检查时间 */
-  cron: string;
-}
-
 export interface PluginCallOption {
   /** 指定插件名称 */
   name: string;
 }
 
-export interface PluginBase {
-  call(name: string, args: any[], option: Partial<PluginCallOption>): Promise<any>;
+export interface PluginEvent {
+  // call(name: string, args: any[], option: Partial<PluginCallOption>): Promise<any>;
   install(urlOrName: string, pluginName: string): Promise<Result | null>;
   uninstall(pluginName: string): Promise<Result | null>;
   update(): any;

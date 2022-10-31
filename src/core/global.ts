@@ -1,70 +1,91 @@
 import { app, ipcMain, ipcRenderer } from "electron";
-import { get, isEmpty, set, defaultsDeep } from "lodash-es";
-import { resolve, dirname } from "path";
+import { defaultsDeep, get, set } from "lodash-es";
+import { dirname, resolve } from "path";
 
-import { ManagerData } from "../typings/manager";
+import { isDev, isMain } from "../helper/electron";
 import { cloneData } from "../helper/utils";
+import { MergeGlobal } from "../typings";
 
-export class Global<T extends ManagerData<any> = ManagerData<any>> {
-  /** 是否是主进程 */
+export class Global<
+  VT extends Record<string, any> = {},
+  T extends MergeGlobal<VT> = MergeGlobal<VT>
+> {
+  isDev: boolean;
   isMain: boolean;
+  protected option: Partial<T>;
 
-  constructor() {
-    this.isMain = !!ipcMain;
+  constructor(option: Partial<T> = {}) {
+    this.option = option;
+    this.isMain = isMain();
+    this.isDev = isDev();
+
     if (this.isMain) {
-      const isDev = require("electron-is-dev");
-      const base = isDev ? resolve(process.cwd(), "dist/datas") : dirname(app.getPath("exe"));
-      console.log("[Base]", base);
-      defaultsDeep(global, {
-        isDev,
-        windows: new Map(),
-        path: {
-          base,
-          log: resolve(base, "log"),
-          config: resolve(base, "config.json"),
-          cache: resolve(base, "cache"),
-          home: app.getPath("home"),
-          store: resolve(base, "store"),
-          plugin: resolve(base, "plugin"),
-          project: resolve(base, "project")
-        }
-      } as ManagerData<any>);
-
-      ipcMain.on("get-global-data", (event, name) => {
-        let value = get(global, name, null);
-        if (value instanceof Map) {
-          value = Array.from(value.entries()).reduce((pre, [k, v]) => {
-            return Object.assign(pre, { [k]: v });
-          }, {});
-        }
-        event.returnValue = cloneData(value);
-      });
+      this.initMain();
+      this.initGlobal(this.option);
     }
   }
 
-  /** 获取全局变量 */
+  private serializationMap(value: Map<string, any>) {
+    return Array.from(value.entries()).reduce((pre, [k, v]) => {
+      return Object.assign(pre, { [k]: v });
+    }, {});
+  }
+
+  private serializationData(value: any) {
+    if (!value) return value;
+    let result: any = value;
+    if (result instanceof Map) {
+      result = this.serializationMap(result);
+    }
+    return cloneData(result);
+  }
+
+  private initMain() {
+    ipcMain.on("get-global-data", (event, name) => {
+      event.returnValue = this.serializationData(get(global, name, null));
+    });
+
+    ipcMain.on("set-global-data", (event, name, value) => {
+      set(global, name, value);
+    });
+  }
+
+  private initGlobal(option: Partial<T>) {
+    const base = this.isDev
+      ? resolve(process.cwd(), "dist/datas")
+      : resolve(dirname(app.getPath("exe")), "project");
+
+    defaultsDeep(global, option, {
+      isDev: this.isDev,
+      windows: new Map(),
+      path: {
+        base,
+        home: app.getPath("home"),
+        log: resolve(base, "log"),
+        config: resolve(base, "config.json"),
+        store: resolve(base, "store"),
+        cache: resolve(base, "cache"),
+        plugin: resolve(base, "plugin"),
+        project: resolve(base, "project")
+      }
+    } as Partial<T>);
+  }
+
   get(): T;
-  get<K extends keyof T>(name: K): T[K];
-  get<K extends keyof T>(name?: K): T | T[K] | null {
+  get<K extends keyof T>(name: K): T[K] | null;
+  get<K extends keyof T>(name: K, defaults: T[K] | null): T[K] | null;
+  get<K extends keyof T>(name?: K, defaults: T[K] | null = null): T | T[K] | null {
     if (this.isMain) {
-      if (name) return get(global, name, null) as T[K];
+      if (name) return get(global, name, defaults) as T[K];
       return global as any as T;
     } else {
-      if (name) return ipcRenderer.sendSync("get-global-data", name);
-      else return null;
+      if (name) return ipcRenderer.sendSync("get-global-data", name) ?? defaults;
+      else return defaults;
     }
   }
 
-  /** 获取地址 */
-  getPath(): ManagerData<void>["path"];
-  getPath<K extends keyof ManagerData<void>["path"]>(key: K): ManagerData<void>["path"][K];
-  getPath<K extends keyof ManagerData<void>["path"]>(key?: K): ManagerData<void>["path"][K] {
-    const path = this.get("path" as any) as ManagerData<void>["path"];
-    return isEmpty(key) ? path : get(path, key as any, null);
-  }
-
-  /** 设置全局变量 */
-  set<K extends keyof T>(name: K, value: T[K]): void {
-    set(global, name, value);
+  set<K extends keyof T>(name: K, value: T[K]) {
+    if (this.isMain) set(global, name, value);
+    else ipcRenderer.send("set-global-data", name, this.serializationData(value));
   }
 }

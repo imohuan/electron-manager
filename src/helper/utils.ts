@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
-import { upperFirst } from "lodash-es";
+import { upperFirst, defaultsDeep, get } from "lodash-es";
+import { readFileSync } from "fs-extra";
 
 /** 延迟时间 */
 export function delay(timeout = 3000): Promise<void> {
@@ -29,4 +30,17 @@ export function formatSize(fileSize: number) {
   const index = Math.floor(Math.log(fileSize) / Math.log(1024));
   const size = fileSize / Math.pow(1024, index);
   return size.toFixed(2) + " " + upperFirst(unitArr[index]);
+}
+
+/** 加载JSON文件 */
+export function loadJson(path: string) {
+  try {
+    return defaultsDeep(JSON.parse(readFileSync(path).toString()), {});
+  } catch {
+    return null;
+  }
+}
+
+export function varReplace(str: string, vars: any, defaults: any = "") {
+  return str.replace(/\{([_a-zA-Z0-9]+)}/g, (_: any, key: any) => get(vars, key, defaults));
 }

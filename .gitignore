@@ -119,9 +119,8 @@ dist
 .pnp.*
 yarn.lock
 
-plugin
-test
-src-electron
+/src-electron
+/plugin
 dist
 dist-electron
 local-test

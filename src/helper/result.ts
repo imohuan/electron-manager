@@ -1,23 +1,23 @@
 export class Result<T = any> {
   public status: number;
   public message: string;
-  public data: T | null;
+  public data: T;
 
-  constructor(option: { status: number; message?: string; data: T | null }) {
+  constructor(option: { status: number; message?: string; data: T }) {
     this.data = option.data;
     this.status = option.status;
     this.message = option?.message || "";
   }
 
-  static msg(status: number, message: string) {
+  static msg(status: number, message: string): Result<any> {
     return new Result({ status, message, data: null });
   }
 
-  static ok<T = any>(data: T | null) {
+  static ok<T = any>(data: T): Result<T> {
     return new Result({ status: 200, data });
   }
 
-  static error(message: string) {
+  static error(message: string): Result<any> {
     return new Result({ status: 100, message, data: null });
   }
 

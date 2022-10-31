@@ -1,7 +1,7 @@
 {
   "name": "@imohuan/electron-manager",
   "version": "0.1.4",
-  "description": "- 监听编译 `pnpm dev`\r - `Esbuild`监听编译 `pnpm esbuild:dev`\r - 项目编译 `pnpm build`\r - 编译预览 `pnpm preview`\r - 执行测试 `pnpm test`\r - 发布 `npm login && npm publish`",
+  "description": "提供更加方便的electron管理工具",
   "author": "imohuan",
   "keywords": [],
   "license": "ISC",

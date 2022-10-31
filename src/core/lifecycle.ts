@@ -2,6 +2,7 @@ import { Result } from "../helper/result";
 import { defaultsDeep, isFunction, get } from "lodash-es";
 import { PluginConfig } from "../typings/plugin";
 import { isString } from "lodash-es";
+import { Context } from "./context";
 
 /** 检查插件详情内容是否符合标准 */
 export function checkLifecycle(config: PluginConfig): Result<PluginConfig | null> {
@@ -12,6 +13,7 @@ export function checkLifecycle(config: PluginConfig): Result<PluginConfig | null
 }
 
 export class Lifecycle {
+  context: Context;
   /** 插件地址 */
   path: string;
   /** 脚本 */
@@ -23,15 +25,16 @@ export class Lifecycle {
   /** 脚本 */
   pluginScripts: any;
 
-  constructor(path: string, option: PluginConfig) {
+  constructor(context: Context, path: string, option: PluginConfig) {
+    this.context = context;
     this.path = path;
     this.option = option;
     this.status = "enable";
 
-    const key = manager.isMain ? "main" : "renderer";
+    const key = this.context.isMain ? "main" : "renderer";
     if (isString(this.option.script)) {
       this.script = this.option.script;
-    } else if (manager.name === key) {
+    } else if (this.context.name === key) {
       this.script = this.option.script[key];
     } else {
       this.script = "";
@@ -54,7 +57,7 @@ export class Lifecycle {
     try {
       return await cb(...args);
     } catch (e) {
-      manager.logger.error(
+      this.context.logger.error(
         "执行插件方法失败: ",
         JSON.stringify({ path: this.path, name: name, args }, null, 2)
       );
@@ -67,12 +70,12 @@ export class Lifecycle {
     try {
       const pluginScripts = require(this.script);
       if (isFunction(pluginScripts)) {
-        this.pluginScripts = await pluginScripts(manager, require("electron"));
+        this.pluginScripts = await pluginScripts(this.context, require("electron"));
       } else {
         this.pluginScripts = pluginScripts;
       }
     } catch (e: any) {
-      manager.logger.error(`加载插件 出现异常:`, e.message);
+      this.context.logger.error(`加载插件 出现异常:`, e.message);
     }
   }
 
