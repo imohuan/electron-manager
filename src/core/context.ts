@@ -5,12 +5,11 @@ import { resolve } from "path";
 import { Logger } from "@imohuan/log";
 
 import { ConfigStore, JsonStore } from "../helper/store";
-import { WindowFactory } from "../logic/window";
 import { ContextEvent, GlobalData, IpcRouter, MergeGlobal, WindowOption } from "../typings";
-import { PluginDownload, PluginManager } from "./download";
 import { Global } from "./global";
 import { Ipc } from "./ipc";
 import { Plugin } from "./plugin";
+import { WindowFactory } from "./window";
 
 export type ObjFunc = Record<string, (...args: any[]) => any>;
 export type MergeContext<T = {}> = T & ContextEvent;
@@ -46,7 +45,7 @@ export class Context<
     this.config = new ConfigStore(config!);
 
     if (this.isMain) {
-      this.window = new WindowFactory();
+      this.window = new WindowFactory(this);
       this.store = new JsonStore(resolve(base!, "store.json"));
       this.logger = new Logger({ dirname: log, label: "Main" });
     } else {

@@ -2,7 +2,7 @@ import { execa } from "execa";
 import { Progress } from "got";
 import { get } from "lodash-es";
 
-import mirror from "../config";
+import mirror from "../config/mirror";
 import { testFastestNetwork, testNetworkSpeed } from "./testUrl";
 import { Result } from "./result";
 import { resolve } from "path";

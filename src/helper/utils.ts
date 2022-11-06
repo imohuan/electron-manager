@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { upperFirst, defaultsDeep, get } from "lodash-es";
-import { readFileSync } from "fs-extra";
+import { readFileSync, existsSync } from "fs-extra";
 
 /** 延迟时间 */
 export function delay(timeout = 3000): Promise<void> {
@@ -35,6 +35,7 @@ export function formatSize(fileSize: number) {
 /** 加载JSON文件 */
 export function loadJson(path: string) {
   try {
+    if (!existsSync(path)) return null;
     return defaultsDeep(JSON.parse(readFileSync(path).toString()), {});
   } catch {
     return null;

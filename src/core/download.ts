@@ -8,7 +8,7 @@ import { EventEmitter } from "stream";
 
 import { getSelector } from "@imohuan/selector";
 
-import config from "../config/index";
+import config from "../config/mirror";
 import { downloadZip } from "../helper/download";
 import { getGitRawFile, getGitZipFastUrl, gitClone } from "../helper/github";
 import { request } from "../helper/request";

@@ -1,2 +1,2 @@
 export * from "./typings";
-export { Manager } from "./core1/manager";
+export { Context } from "./core/context";

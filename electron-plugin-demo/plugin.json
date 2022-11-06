@@ -1,9 +1,0 @@
-{
-  "name": "demo",
-  "icon": "",
-  "hot": true,
-  "debug": true,
-  "version": "1.0.6777",
-  "description": "测试用",
-  "script": "./main.js"
-}
