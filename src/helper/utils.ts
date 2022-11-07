@@ -36,7 +36,7 @@ export function formatSize(fileSize: number) {
 export function loadJson(path: string) {
   try {
     if (!existsSync(path)) return null;
-    return defaultsDeep(JSON.parse(readFileSync(path).toString()), {});
+    return defaultsDeep(JSON.parse(readFileSync(path).toString()), { path });
   } catch {
     return null;
   }

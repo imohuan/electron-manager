@@ -9,6 +9,10 @@ export class Result<T = any> {
     this.message = option?.message || "";
   }
 
+  isOk() {
+    return this.status === 200;
+  }
+
   static msg(status: number, message: string): Result<any> {
     return new Result({ status, message, data: null });
   }

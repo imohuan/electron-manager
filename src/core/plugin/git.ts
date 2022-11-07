@@ -7,7 +7,7 @@ import { basename, resolve } from "path";
 import { loadJson } from "src/helper/utils";
 
 import { downloadZip } from "../../helper/download";
-import { getGitRawFile, getGitZipFastUrl } from "../../helper/github";
+import { getGitZipFastUrl } from "../../helper/github";
 import { AdapterBase, AdapterBaseOption, AdapterInfo, ExecCommandOption } from "./base";
 
 export interface AdapterGitOption extends AdapterBaseOption {

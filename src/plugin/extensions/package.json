@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "rubick-plugin-db": "^0.0.2-24"
+  }
+}
