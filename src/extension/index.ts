@@ -122,6 +122,7 @@ export class ExtensionHost {
   private strategy: ExtensionStrategy;
   private plugins: Map<string, any>;
   private hooks: Hooks;
+  private hookMap: Map<string, { name: string; func: Function }> = new Map();
 
   constructor(ops: Partial<ExtensionHostOption> = {}) {
     this.option = defaultsDeep(ops, {
@@ -189,6 +190,7 @@ export class ExtensionHost {
       optionFile,
       JSON.stringify(defaultsDeep({ repo: url }, extensionOption), null, 2)
     );
+    this.hookMap.set(extensionOption.name, "");
     return Result.ok(true);
   }
 
@@ -282,6 +284,12 @@ export class Hooks {
   add(name: string, fn: Function) {
     const hooks = this.get(name);
     hooks.add(fn);
+    this.hooks.set(name, hooks);
+  }
+
+  remove(name: string, fn: Function) {
+    const hooks = this.get(name);
+    hooks.delete(fn);
     this.hooks.set(name, hooks);
   }
 
@@ -416,12 +424,11 @@ export class StrategyGit extends AbstractStrategy {
     option: Partial<ExtensionCallInfoOption>
   ): Promise<ExtensionInfo | null> {
     if (option?.local) {
-      return loadJson(resolve(this.option.baseDir, this.getUrlName(gitUrl)));
+      return loadJson(resolve(this.option.baseDir, this.getUrlName(gitUrl), this.option.fileName));
     } else {
       const repo = /(https:\/\/github\.com\/[^\/]+\/[^\/]+)/.exec(gitUrl)?.[1] || gitUrl;
       const name = repo.replace("https://github.com/", "").replace(".git", "");
       const url = `https://raw.githubusercontent.com/${name}/main/${this.option.fileName}`;
-      console.log("url", url);
       return await got
         .get(url, { agent: { https: new Agent({ rejectUnauthorized: false }) } })
         .json<any>()

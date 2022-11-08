@@ -1,11 +1,34 @@
 import { execa } from "execa";
-import { Progress } from "got";
 import { get } from "lodash-es";
 
-import mirror from "../config/mirror";
 import { testFastestNetwork, testNetworkSpeed } from "./testUrl";
-import { Result } from "./result";
-import { resolve } from "path";
+
+export const githubMirror = [
+  "https://github.com/{name}/archive/refs/heads/{branch}.zip",
+  "https://gh.flyinbug.top/gh/https://github.com/{name}/archive/refs/heads/{branch}.zip",
+  "https://github.91chi.fun/https://github.com/{name}/archive/refs/heads/{branch}.zip",
+  "https://proxy.zyun.vip/https://github.com/{name}/archive/refs/heads/{branch}.zip",
+  "https://archive.fastgit.org/https://github.com/{name}/archive/refs/heads/{branch}.zip",
+  "https://gh.ddlc.top/https://github.com/{name}/archive/refs/heads/{branch}.zip",
+  "https://ghproxy.com/https://github.com/{name}/archive/refs/heads/{branch}.zip"
+];
+
+export const githubRawMirror = [
+  "https://raw.githubusercontent.com/{name}/{branch}/{filePath}",
+  "https://sourcegraph.com/github.com/{name}@{branch}/-/blob/{filePath}",
+  "https://github.com/{name}/raw/{branch}/{filePath}",
+  "https://jsd.eagleyao.com/gh/{name}@{branch}/{filePath}",
+  "https://raw.iqiq.io/{name}/{branch}/{filePath}",
+  "https://raw.kgithub.com/{name}/{branch}/{filePath}",
+  "https://fastly.jsdelivr.net/gh/{name}@{branch}/{filePath}",
+  "https://cdn.staticaly.com/gh/{name}/{branch}/{filePath}",
+  "https://raw.fastgit.org/{name}/{branch}/{filePath}",
+  "https://ghproxy.net/https://raw.githubusercontent.com/{name}/{branch}/{filePath}",
+  "https://gcore.jsdelivr.net/gh/{name}@{branch}/{filePath}",
+  "https://raw.githubusercontents.com/{name}/{branch}/{filePath}",
+  "https://github.moeyy.xyz/https://raw.githubusercontent.com/{name}/{branch}/{filePath}",
+  "https://github.com/{name}/blame/{branch}/{filePath}"
+];
 
 export function getGitUrlInfo(url: string) {
   const repo = /(https:\/\/github\.com\/[^\/]+\/[^\/]+)/.exec(url)?.[1] || url;
@@ -26,7 +49,7 @@ export async function getGitZipFastUrl(
   timeout: number = 3000
 ): Promise<string> {
   const { name } = getGitUrlInfo(gitUrl);
-  const urls = mirror.github.map((url) =>
+  const urls = githubMirror.map((url) =>
     url.replace(/\{([_a-zA-Z0-9]+)}/g, (_: any, key: any) => get({ name, branch }, key, ""))
   );
   return await testNetworkSpeed(urls, timeout);
@@ -42,7 +65,7 @@ export async function getGitRawFile(
   branch: string = "main"
 ): Promise<{ url: string; result: any } | null> {
   const { name } = getGitUrlInfo(gitUrl);
-  const urls = mirror.githubRaw.map((url) =>
+  const urls = githubRawMirror.map((url) =>
     url.replace(/\{([_a-zA-Z0-9]+)}/g, (_: any, key: any) =>
       get({ name, branch, filePath }, key, "")
     )
@@ -50,39 +73,7 @@ export async function getGitRawFile(
   return await testFastestNetwork(urls);
 }
 
-/**
- * git clone
- * @param url `.git`地址
- * @param name 本地存储名称
- * @param dir 本地存储目录
- * @returns
- */
-export async function gitClone(
-  url: string,
-  name: string,
-  dir: string,
-  onProgress: (progress: Progress) => any = () => {}
-): Promise<Result> {
-  return new Promise(async (_resolve) => {
-    const isOk = await checkGit();
-    if (!isOk) return _resolve(Result.error("未安装git"));
-    const _process = execa("git", ["clone", url, name, "--progress"], { cwd: dir });
-    const onData = (data: any) => {
-      const value = /Receiving objects:\s+(\d+)%\s+\((\d+)\/(\d+)\)/.exec(data.toString());
-      if (!value) return;
-      const progress: Progress = {
-        percent: parseInt(value[1]),
-        transferred: parseInt(value[2]),
-        total: parseInt(value[3])
-      };
-      onProgress(progress);
-    };
-    _process.stdout?.on("data", onData);
-    _process.stderr?.on("data", onData);
-    _process.on("exit", () => _resolve(Result.ok(resolve(dir, name))));
-  });
-}
-
+/** 检查是否支持命令 Git */
 export function checkGit(): Promise<boolean> {
   return new Promise((_resolve) => {
     execa("git", ["-v"])

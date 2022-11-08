@@ -23,7 +23,8 @@
     "build:dev": "rimraf ./dist && esno ./scripts/build.ts",
     "dev": "pnpm build:dev && node ./bin/manager.js dev",
     "icon": "pnpm build:dev && node ./bin/manager.js icon --input ./test/1.jpg -o ./build-icon",
-    "pack": "pnpm build:dev && node ./bin/manager.js pack"
+    "pack": "pnpm build:dev && node ./bin/manager.js pack",
+    "test": "vitest extension --ui"
   },
   "peerDependencies": {
     "@electron/remote": ">=2.0.8",
