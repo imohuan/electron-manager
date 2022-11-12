@@ -30,3 +30,7 @@ export class Hooks {
     }
   }
 }
+
+export class HookManager {
+  constructor() {}
+}
